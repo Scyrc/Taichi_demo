@@ -10,6 +10,8 @@ dt = 4e-2 / n
 substeps = int(1.0 / 60 // dt)
 
 gravity = ti.Vector([0, -9.8, 0])
+wind_force = ti.Vector([-6, 0, 5])
+
 springY = 3e4
 dashpot_damping = 1e4
 drag_damping = 1
@@ -27,6 +29,15 @@ vertices = ti.Vector.field(3, float, shape=n * n)
 colors = ti.Vector.field(3, float, shape=n * n)
 
 bending_springs = False
+wind_on = ti.field(int, shape=())
+wind_on[None] = 0
+
+
+def change_wind():
+    if wind_on[None] == 0:
+        wind_on[None] = 1
+    else:
+        wind_on[None] = 0
 
 
 @ti.kernel
@@ -55,9 +66,9 @@ def initialize_mass_indices():
 
     for i, j in ti.ndrange(n, n):
         if (i // 4 + j // 4) % 2 == 0:
-            colors[i * n + j] = (0.22, 0.72, 0.52)
+            colors[i * n + j] = (250/255.0, 240/255.0, 230/255.0)
         else:
-            colors[i * n + j] = (1, 0.344, 0.52)
+            colors[i * n + j] = (250/255.0, 240/255.0, 230/255.0)
 
 
 initialize_mass_indices()
@@ -79,6 +90,8 @@ else:
 def substep():
     for i in ti.grouped(vel):
         vel[i] += gravity * dt
+        if wind_on[None] == 1:
+            vel[i] += wind_force * dt
 
     for i in ti.grouped(pos):
         force = ti.Vector([0.0, 0.0, 0.0])
@@ -115,15 +128,47 @@ def update_vertices():
 
 window = ti.ui.Window("Taichi Cloth Simulation on GGUI", (1024, 1024), vsync=True)
 canvas = window.get_canvas()
-canvas.set_background_color((1, 1, 1))
+canvas.set_background_color((0, 0, 0))
 scene = ti.ui.Scene()
 camera = ti.ui.Camera()
 
 current_t = 0.0
 initialize_mass_points()
 time_start = time.time()
+camera_x = 0
+camera_y = 0
+camera_z = 5
+k = 0.2
 while window.running:
-    if current_t > 1.5:
+
+
+    if window.get_event(ti.ui.PRESS):
+        if window.event.key == 'r':
+            initialize_mass_points()
+            print("reset")
+
+        if window.event.key == 'y':
+            change_wind()
+            print("change wind")
+
+    if window.is_pressed('a'):
+        camera_x -= 0.25*k
+    if window.is_pressed('d'):
+        camera_x += 0.25*k
+
+    if window.is_pressed('w'):
+        camera_z -= 0.25*k
+
+    if window.is_pressed('s'):
+        camera_z += 0.25*k
+
+    if window.is_pressed('q'):
+        camera_y += 0.25*k
+
+    if window.is_pressed('e'):
+        camera_y -= 0.25*k
+
+    if current_t > 300:
         time_end = time.time()
         print(time_end - time_start)
         time_start = time.time()
@@ -136,10 +181,10 @@ while window.running:
         current_t += dt
 
     update_vertices()
-    camera.position(0.0, 0, 5)
+    camera.position(camera_x, camera_y, camera_z)
     camera.lookat(0.0, 0.0, 0)
     scene.set_camera(camera)
-    scene.point_light(pos=(0, 1, 2), color=(1, 1, 1))
+    scene.point_light(pos=(3, 6, 6), color=(255/255.0, 209/255.0, 163/255.0))
     scene.ambient_light((0.5, 0.5, 0.5))
     scene.mesh(vertices, indices=indices, per_vertex_color=colors, two_sided=True)
     scene.particles(ball_center, radius=ball_radius * 0.95, color=(0.5, 0.42, 0.8))
