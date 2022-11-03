@@ -27,11 +27,17 @@ class ParticleSystem:
         self.zone_num = ti.field(int, shape=(n, n))
 
         self.initialize_mass_points()
-        self.wind_on = False
-        self.wind_force = ti.Vector([-10.0, 0, 6.0])
+        self.wind_on = ti.field(int, shape=())
+        self.wind_on[None] = 0
+        self.wind_force = ti.Vector([5.0, 0, 6.0])
 
     def change_wind(self):
-        self.wind_on = not self.wind_on
+        if self.wind_on[None] == 0:
+            self.wind_on[None] = 1
+        else:
+            self.wind_on[None] = 0
+
+        print(self.wind_on)
 
 
     @ti.kernel
@@ -73,7 +79,7 @@ class ParticleSystem:
     def take_step(self):
         for i in ti.grouped(self.vel):
             self.vel[i] += self.gravity * self.dt
-            if self.wind_on:
+            if self.wind_on[None] == 1:
                 self.vel[i] += self.wind_force * self.dt
 
             # self.vel[i] += self.vel[i] * self.drag_factor * self.dt
@@ -197,7 +203,7 @@ if __name__ == "__main__":
     scene.set_camera(camera)
     scene.point_light(pos=(0, 1, 2), color=(1, 1, 1))
     scene.ambient_light((0.5, 0.5, 0.5))
-    global camera_x, camera_y, camera_z
+
     camera_x = 0
     camera_y = 20
     camera_z = 40
